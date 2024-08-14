@@ -88,7 +88,13 @@ private:
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     void createSwapChain();
-    
+    void createFramebuffers();
+    void createCommandPool();
+   void createCommandBuffer();
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+   void drawFrame();
+    void createSyncObjects();
+
     const uint32_t WIDTH = 800;
     const uint32_t HEIGHT = 600;
 
@@ -96,9 +102,15 @@ private:
         "VK_LAYER_KHRONOS_validation"
     };
 
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
+    VkCommandBuffer commandBuffer;
+    VkCommandPool commandPool;
     VkPipeline graphicsPipeline;
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
+    std::vector<VkFramebuffer> swapChainFramebuffers;
     std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
