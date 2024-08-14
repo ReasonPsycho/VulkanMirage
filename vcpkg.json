@@ -1,0 +1,26 @@
+{
+  "dependencies" : [ {
+    "name" : "vulkan"
+  }, {
+    "name" : "tracy"
+  }, {
+    "name" : "imgui"
+  }, {
+    "name" : "imguizmo"
+  }, {
+    "name" : "stb"
+  }, {
+    "name" : "assimp"
+  }, {
+    "name" : "spdlog"
+  }, {
+    "name" : "glm"
+  }, {
+    "name" : "gtest"
+  }, {
+    "name" : "sdl2",
+    "features" : ["vulkan"]
+  }, {
+    "name" : "vulkan-memory-allocator"
+  } ]
+}
