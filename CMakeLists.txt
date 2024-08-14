@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.28)
 project(VulkanMiragePathtracer)
 set(CMAKE_CXX_STANDARD 26)
 
+
+
 # Adding debug and build definitions 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_definitions(-DDEBUG_BUILD)
@@ -86,3 +88,4 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${CMAKE_SOURCE_DIR}/tracey
         ${CMAKE_CURRENT_BINARY_DIR}/tracey)
+

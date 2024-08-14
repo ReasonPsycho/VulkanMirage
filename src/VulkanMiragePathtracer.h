@@ -48,7 +48,7 @@ private:
     void mainLoop();
 
     void cleanup();
-
+    void createRenderPass();
     bool checkValidationLayerSupport();
 
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
@@ -56,6 +56,8 @@ private:
     void pickPhysicalDevice();
 
     void createLogicalDevice();
+    void createGraphicsPipeline();
+    VkShaderModule createShaderModule(const std::vector<char>& code);
 
     void createSurface();
     void     createImageViews();
@@ -65,6 +67,8 @@ private:
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
     bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char *> &requiredExtensions);
+
+    static std::vector<char> readFile(const std::string& filename);
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -91,7 +95,10 @@ private:
     const std::vector<const char *> validationLayers = {
         "VK_LAYER_KHRONOS_validation"
     };
-    
+
+    VkPipeline graphicsPipeline;
+    VkRenderPass renderPass;
+    VkPipelineLayout pipelineLayout;
     std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
