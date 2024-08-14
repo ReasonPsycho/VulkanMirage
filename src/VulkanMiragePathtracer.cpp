@@ -4,6 +4,9 @@
 
 #include "VulkanMiragePathtracer.h"
 
+#include <algorithm>
+#include <set>
+
 void VulkanMiragePathtracer::run() {
     initWindow();
     initVulkan();
@@ -26,14 +29,12 @@ void VulkanMiragePathtracer::initWindow() {
 void VulkanMiragePathtracer::initVulkan() {
     createInstance();
     setupDebugMessenger();
+    createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+    createSwapChain();
+    createImageViews();
 
-    // now that you have a window and a vulkan instance you need a surface
-    VkSurfaceKHR surface;
-    if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
-        // failed to create a surface!
-    }
 }
 
 void VulkanMiragePathtracer::createInstance() {
@@ -43,15 +44,15 @@ void VulkanMiragePathtracer::createInstance() {
 
     auto extensions = getRequiredExtensions();
 
-    VkApplicationInfo appInfo {};
+    VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Hello Triangle";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
-        
-    VkInstanceCreateInfo createInfo {};
+
+    VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
@@ -61,20 +62,20 @@ void VulkanMiragePathtracer::createInstance() {
         createInfo.ppEnabledLayerNames = validationLayers.data();
 
         populateDebugMessengerCreateInfo(debugCreateInfo);
-        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
+        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
     } else {
         createInfo.enabledLayerCount = 0;
 
         createInfo.pNext = nullptr;
     }
-        
+
     createInfo.enabledExtensionCount = extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
-    
+
     VkResult res;
     res = vkCreateInstance(&createInfo, nullptr, &instance);
     if (res != VK_SUCCESS) {
-        // do some error checking
+        throw std::runtime_error("failed to create instance!");
     }
 }
 
@@ -90,15 +91,15 @@ void VulkanMiragePathtracer::setupDebugMessenger() {
 
 std::vector<const char *> VulkanMiragePathtracer::getRequiredExtensions() {
     unsigned int extension_count;
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count,nullptr)) {
-        throw std::runtime_error("Getting SDL instance vulkan extensions failed!");
-    }
-    
-    std::vector<const char*> extensions;
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, extensions.data())) {
+    if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, nullptr)) {
         throw std::runtime_error("Getting SDL instance vulkan extensions failed!");
     }
 
+    std::vector<const char *> extensions(extension_count);
+    if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, extensions.data())) {
+        throw std::runtime_error("Getting SDL instance vulkan extensions failed!");
+    }
+    
     if (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
@@ -110,23 +111,27 @@ void VulkanMiragePathtracer::mainLoop() {
     SDL_Event event;
     bool isRunning = true;
     while (isRunning) {
-    
-        while(SDL_PollEvent(&event)) {
+        while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 isRunning = false;
             }
         }
-    
+
         // Include your rendering code here...
-    
     }
 }
 
 void VulkanMiragePathtracer::cleanup() {
+    for (auto imageView : swapChainImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+    vkDestroySwapchainKHR(device, swapChain, nullptr);
     if (enableValidationLayers) {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
     vkDestroyDevice(device, nullptr);
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    SDL_DestroyWindowSurface(window);
     vkDestroyInstance(instance, nullptr);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -138,11 +143,11 @@ bool VulkanMiragePathtracer::checkValidationLayerSupport() {
 
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-    
-    for (const char* layerName : validationLayers) {
+
+    for (const char *layerName: validationLayers) {
         bool layerFound = false;
 
-        for (const auto& layerProperties : availableLayers) {
+        for (const auto &layerProperties: availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -160,8 +165,12 @@ bool VulkanMiragePathtracer::checkValidationLayerSupport() {
 void VulkanMiragePathtracer::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = debugCallback;
 }
 
@@ -173,8 +182,8 @@ void VulkanMiragePathtracer::pickPhysicalDevice() {
     }
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    
-    for (const auto& device : devices) {
+
+    for (const auto &device: devices) {
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
             break;
@@ -193,20 +202,35 @@ void VulkanMiragePathtracer::createLogicalDevice() {
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
     queueCreateInfo.queueCount = 1;
-    
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
     float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    for (uint32_t queueFamily: uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
 
+    
+    
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
-
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());;
     createInfo.pEnabledFeatures = &deviceFeatures;
-
-    createInfo.enabledExtensionCount = 0;
+    std::vector<const char *> extensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+    
+    createInfo.enabledExtensionCount = extensions.size();
+    createInfo.ppEnabledExtensionNames = extensions.data();
 
     if (enableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -219,20 +243,51 @@ void VulkanMiragePathtracer::createLogicalDevice() {
         throw std::runtime_error("failed to create logical device!");
     }
 
+    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 }
 
+void VulkanMiragePathtracer::createSurface() {
+    if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
+        throw std::runtime_error("Failed to create surface: " + std::string(SDL_GetError()));
+    }
+}
+
+void VulkanMiragePathtracer::createImageViews() {
+    swapChainImageViews.resize(swapChainImages.size());
+    for (size_t i = 0; i < swapChainImages.size(); i++) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = swapChainImages[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = swapChainImageFormat;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1;
+    }
+}
+
 bool VulkanMiragePathtracer::isDeviceSuitable(VkPhysicalDevice device) {
-    const std::vector<const char*> ray_tracing_extensions = {
-        "VK_KHR_acceleration_structure", 
-        "VK_KHR_ray_tracing_pipeline", 
-        "VK_KHR_buffer_device_address", 
-        "VK_KHR_deferred_host_operations", 
+    const std::vector<const char *> ray_tracing_extensions = {
+        "VK_KHR_acceleration_structure",
+        "VK_KHR_ray_tracing_pipeline",
+        "VK_KHR_buffer_device_address",
+        "VK_KHR_deferred_host_operations",
         "VK_EXT_descriptor_indexing",
         "VK_KHR_spirv_1_4",
         "VK_KHR_shader_float_controls"
     };
-    
+
+    const std::vector<const char *> deviceExtensions  = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -244,8 +299,15 @@ bool VulkanMiragePathtracer::isDeviceSuitable(VkPhysicalDevice device) {
     // Checking for ray tracing support
     bool isRayTracingSupported = checkDeviceExtensionSupport(device, ray_tracing_extensions);
 
-    
-    return isDiscreteGPU && isRayTracingSupported && findQueueFamilies(device).isComplete();
+    bool extensionsSupported = checkDeviceExtensionSupport(device,deviceExtensions);
+
+    bool swapChainAdequate = false;
+    if (extensionsSupported) {
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+    }
+
+    return isDiscreteGPU && isRayTracingSupported && findQueueFamilies(device).isComplete() && extensionsSupported && swapChainAdequate;
 }
 
 QueueFamilyIndices VulkanMiragePathtracer::findQueueFamilies(VkPhysicalDevice device) {
@@ -255,31 +317,41 @@ QueueFamilyIndices VulkanMiragePathtracer::findQueueFamilies(VkPhysicalDevice de
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+
     int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
+    for (const auto &queueFamily: queueFamilies) {
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
+        }
+
+        VkBool32 presentSupport = false;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+        if (presentSupport) {
+            indices.presentFamily = i;
         }
 
         if (indices.isComplete()) {
             break;
         }
-        
+
         i++;
     }
-    
+
     return indices;
 }
 
-bool VulkanMiragePathtracer::checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char*>& requiredExtensions) {
+bool VulkanMiragePathtracer::checkDeviceExtensionSupport(VkPhysicalDevice device,
+                                                         const std::vector<const char *> &requiredExtensions) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-    
-    for (const char* extension : requiredExtensions) {
+
+    for (const char *extension: requiredExtensions) {
         bool extensionFound = false;
-        for (const auto& availExtension : availableExtensions) {
+        for (const auto &availExtension: availableExtensions) {
             if (strcmp(extension, availExtension.extensionName) == 0) {
                 extensionFound = true;
                 break;
@@ -290,29 +362,30 @@ bool VulkanMiragePathtracer::checkDeviceExtensionSupport(VkPhysicalDevice device
             return false;
         }
     }
-    
+
     return true;
 }
 
 
 VkBool32 VulkanMiragePathtracer::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                               VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                               VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                               const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                                                void *pUserData) {
-
     if (std::string(pCallbackData->pMessage).find("GalaxyOverlayVkLayer") != std::string::npos) {
         return VK_FALSE;
     } //I don't wanna msg about it 
-    
+
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
     }
 
     return VK_FALSE;
 }
 
 VkResult VulkanMiragePathtracer::CreateDebugUtilsMessengerEXT(VkInstance instance,
-    const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator,
-    VkDebugUtilsMessengerEXT*pDebugMessenger) {
+                                                              const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                                              const VkAllocationCallbacks *pAllocator,
+                                                              VkDebugUtilsMessengerEXT *pDebugMessenger) {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr) {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -322,9 +395,128 @@ VkResult VulkanMiragePathtracer::CreateDebugUtilsMessengerEXT(VkInstance instanc
 }
 
 void VulkanMiragePathtracer::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-    const VkAllocationCallbacks *pAllocator) {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+                                                           const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
+            vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
         func(instance, debugMessenger, pAllocator);
     }
+}
+
+SwapChainSupportDetails VulkanMiragePathtracer::querySwapChainSupport(VkPhysicalDevice device) {
+    SwapChainSupportDetails details;
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+    
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+    if (formatCount != 0) {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+    }
+    
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+    if (presentModeCount != 0) {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+    }
+    return details;
+}
+
+VkSurfaceFormatKHR VulkanMiragePathtracer::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+    for (const auto& availableFormat : availableFormats) {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            return availableFormat;
+        }
+    }
+
+    return availableFormats[0];
+}
+
+VkPresentModeKHR VulkanMiragePathtracer::chooseSwapPresentMode(
+    const std::vector<VkPresentModeKHR> &availablePresentModes) {
+    for (const auto& availablePresentMode : availablePresentModes) {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            return availablePresentMode;
+        }
+    }
+
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D VulkanMiragePathtracer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return capabilities.currentExtent;
+    } else {
+        int framebufferWidth, framebufferHeight;
+        SDL_GL_GetDrawableSize(window, &framebufferWidth, &framebufferHeight);
+
+        VkExtent2D actualExtent = {
+            static_cast<uint32_t>(framebufferWidth),
+            static_cast<uint32_t>(framebufferHeight)
+        };
+
+        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+        return actualExtent;
+    }
+}
+
+void VulkanMiragePathtracer::createSwapChain() {
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+
+    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+        imageCount = swapChainSupport.capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = surface;
+    
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+    createInfo.imageExtent = extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+    if (indices.graphicsFamily != indices.presentFamily) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0; // Optional
+        createInfo.pQueueFamilyIndices = nullptr; // Optional
+    }
+
+    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = presentMode;
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create swap chain!");
+    }
+
+    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+    swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+    
+    swapChainImageFormat = surfaceFormat.format;
+    swapChainExtent = extent;
 }
