@@ -90,10 +90,17 @@ private:
     void createSwapChain();
     void createFramebuffers();
     void createCommandPool();
-   void createCommandBuffer();
+   void createCommandBuffers();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
    void drawFrame();
     void createSyncObjects();
+    void recreateSwapChain();
+    void cleanupSwapChain();
+
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+
+    bool framebufferResized = false;
+    bool isMinimized = false;
 
     const uint32_t WIDTH = 800;
     const uint32_t HEIGHT = 600;
@@ -102,10 +109,12 @@ private:
         "VK_LAYER_KHRONOS_validation"
     };
 
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
-    VkFence inFlightFence;
-    VkCommandBuffer commandBuffer;
+    uint32_t currentFrame = 0;
+
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    std::vector<VkCommandBuffer> commandBuffers;    
     VkCommandPool commandPool;
     VkPipeline graphicsPipeline;
     VkRenderPass renderPass;
