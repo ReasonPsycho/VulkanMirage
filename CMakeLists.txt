@@ -19,6 +19,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/res)
 # Gather source and header files
 file(GLOB_RECURSE SOURCE_FILES "src/*.cpp") #SIDE note u need to rerun CMAKE each time u add class manually since it doesn't need to change to add file.
 file(GLOB_RECURSE HEADER_FILES "src/*.h")
+file(GLOB_RECURSE MODULES "src/*.ixx")  # adjust pattern based on your actual module files
+
+
 
 # Search for the assets files
 file(GLOB_RECURSE ASSETS_FILES "res/*.*")
@@ -33,6 +36,13 @@ enable_language("RC")
 add_executable(${PROJECT_NAME} ${HEADER_FILES} ${SOURCE_FILES} ${ASSETS_FILES} resources.rc)
 # Treat asset files as headers (prevents them from being compiled)
 set_source_files_properties(${ASSETS_FILES} PROPERTIES HEADER_FILE_ONLY TRUE)
+
+# --- Enable module interfaces ---
+# Enable CXX language features for the target
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23) #
+
+# Add compile options
+target_compile_options(${PROJECT_NAME} PRIVATE /experimental:module)
 
 # ---- Libraries ----
 add_definitions(-D GLM_ENABLE_EXPERIMENTAL)
