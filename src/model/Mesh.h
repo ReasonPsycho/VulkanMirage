@@ -4,9 +4,11 @@
 #include <map>
 #include <memory>
 #include <vector>
+
+#include "Texture.h"
+#include "Vertex.h"
 using namespace std;
-#include "commonTypes/Texture.h"
-#include "commonTypes/Vertex.h"
+
 
 class Mesh {
 public:

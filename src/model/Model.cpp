@@ -1,6 +1,6 @@
 #include "Model.h"
 
-Model::Model(string const &path, bool gamma) {
+Model::Model(string const &path) {
     loadModel(path);
 }
 
@@ -51,7 +51,7 @@ unique_ptr<Mesh> Model::processMesh(aiMesh *mesh, const aiScene *scene) {
         vector.x = mesh->mVertices[i].x;
         vector.y = mesh->mVertices[i].y;
         vector.z = mesh->mVertices[i].z;
-        vertex.Position = vector;
+        vertex.pos = vector;
         // normals
         if (mesh->HasNormals()) {
             vector.x = mesh->mNormals[i].x;
@@ -66,9 +66,9 @@ unique_ptr<Mesh> Model::processMesh(aiMesh *mesh, const aiScene *scene) {
             // use models where a vertex can have multiple texture coordinates so we always take the first set (0).
             vec.x = mesh->mTextureCoords[0][i].x;
             vec.y = mesh->mTextureCoords[0][i].y;
-            vertex.TexCoords = vec;
+            vertex.texCoord = vec;
         } else
-            vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+            vertex.texCoord = glm::vec2(0.0f, 0.0f);
 
         vertices.push_back(vertex);
     }
@@ -89,10 +89,10 @@ unique_ptr<Mesh> Model::processMesh(aiMesh *mesh, const aiScene *scene) {
     // normal: texture_normalN
 
 
-    textures["texture_diffuse"] = loadMaterialTexture(material, aiTextureType_DIFFUSE);
-    textures["texture_specular"] = loadMaterialTexture(material, aiTextureType_SPECULAR);
-    textures["texture_normal"] = loadMaterialTexture(material, aiTextureType_HEIGHT);
-    textures["texture_height"] = loadMaterialTexture(material, aiTextureType_AMBIENT);
+   // textures["texture_diffuse"] = loadMaterialTexture(material, aiTextureType_DIFFUSE);
+    //   textures["texture_specular"] = loadMaterialTexture(material, aiTextureType_SPECULAR);
+    //  textures["texture_normal"] = loadMaterialTexture(material, aiTextureType_HEIGHT);
+    //   textures["texture_height"] = loadMaterialTexture(material, aiTextureType_AMBIENT);
     // return a mesh object created from the extracted mesh data
     return make_unique<Mesh>(vertices, indices, textures);
 }

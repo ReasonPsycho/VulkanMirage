@@ -8,7 +8,6 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <stb_image.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -161,9 +160,8 @@ public:
     /**
      * @brief Initializes a new instance of the Model class.
      * @param path The path to the model file.
-     * @param gamma A boolean value indicating whether gamma correction should be applied.
      */
-    explicit Model(string const &path, bool gamma = false);
+    explicit Model(string const &path);
 
 private:
     /**
@@ -215,7 +213,7 @@ private:
                     break;
                 }
                 auto texture = make_shared<Texture>(str.C_Str());
-                textures_loaded.push_back(textures_loaded[j]);
+                textures_loaded.push_back(texture);
                 return texture;
             }
         } else {

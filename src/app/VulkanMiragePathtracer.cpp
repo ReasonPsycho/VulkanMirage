@@ -4,10 +4,7 @@
 
 #include "VulkanMiragePathtracer.h"
 
-#include <algorithm>
-#include <chrono>
-#include <fstream>
-#include <set>
+
 
 void VulkanMiragePathtracer::run() {
     initWindow();
@@ -111,7 +108,12 @@ void VulkanMiragePathtracer::createDepthResources() {
     depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
+void VulkanMiragePathtracer::loadModel() {
+    model = new Model("res/models/shroom/shroom.fbx");
+}
+
 void VulkanMiragePathtracer::initVulkan() {
+    loadModel();
     createInstance();
     setupDebugMessenger();
     createSurface();
@@ -610,13 +612,7 @@ swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageForma
 
 bool VulkanMiragePathtracer::isDeviceSuitable(VkPhysicalDevice device) {
     const std::vector<const char *> ray_tracing_extensions = {
-        "VK_KHR_acceleration_structure",
-        "VK_KHR_ray_tracing_pipeline",
-        "VK_KHR_buffer_device_address",
-        "VK_KHR_deferred_host_operations",
-        "VK_EXT_descriptor_indexing",
-        "VK_KHR_spirv_1_4",
-        "VK_KHR_shader_float_controls"
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME
     };
 
     const std::vector<const char *> deviceExtensions = {
@@ -949,7 +945,7 @@ void VulkanMiragePathtracer::createCommandPool() {
 
 void VulkanMiragePathtracer::createTextureImage() {
     int texWidth, texHeight, texChannels;
-    stbi_uc *pixels = stbi_load("res/textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc *pixels = stbi_load("res/models/shroom/shroom.fbm/Shroom diffuse.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels) {
@@ -1046,7 +1042,7 @@ void VulkanMiragePathtracer::recordCommandBuffer(VkCommandBuffer commandBuffer, 
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->meshes[0].get()->indices.size()), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -1179,7 +1175,7 @@ void VulkanMiragePathtracer::cleanupSwapChain() {
 }
 
 void VulkanMiragePathtracer::createVertexBuffer() {
-    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize bufferSize = sizeof(Vertex) * model->meshes[0].get()->vertices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1189,7 +1185,7 @@ void VulkanMiragePathtracer::createVertexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, vertices.data(), (size_t) bufferSize);
+    memcpy(data, model->meshes[0].get()->vertices.data(), (size_t) bufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -1258,7 +1254,7 @@ void VulkanMiragePathtracer::updateUniformBuffer(uint32_t currentImage) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f));
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f,
                                 10.0f);
@@ -1375,7 +1371,7 @@ void VulkanMiragePathtracer::copyBufferToImage(VkBuffer buffer, VkImage image, u
 }
 
 void VulkanMiragePathtracer::createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    VkDeviceSize bufferSize = sizeof(model->meshes[0].get()->indices[0]) * model->meshes[0].get()->indices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1385,7 +1381,7 @@ void VulkanMiragePathtracer::createIndexBuffer() {
 
     void *data;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, indices.data(), (size_t) bufferSize);
+    memcpy(data, model->meshes[0].get()->indices.data(), (size_t) bufferSize);
     vkUnmapMemory(device, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
