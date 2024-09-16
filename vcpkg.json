@@ -4,7 +4,8 @@
   }, {
     "name" : "tracy"
   }, {
-    "name" : "imgui"
+    "name" : "imgui",
+    "features" : ["vulkan-binding","sdl2-binding"]
   }, {
     "name" : "imguizmo"
   }, {

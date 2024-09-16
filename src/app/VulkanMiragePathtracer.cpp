@@ -9,6 +9,7 @@
 void VulkanMiragePathtracer::run() {
     initWindow();
     initVulkan();
+    initImgui();
     mainLoop();
     cleanup();
 }
@@ -214,6 +215,7 @@ void VulkanMiragePathtracer::mainLoop() {
     bool isRunning = true;
     while (isRunning) {
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event); // Forward your event to backend
             switch (event.type) {
                 case SDL_WINDOWEVENT:
                     switch (event.window.event) {
@@ -231,12 +233,24 @@ void VulkanMiragePathtracer::mainLoop() {
                     break;
             }
         }
+      
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow(); // Show demo window! :)
+
+        
         drawFrame();
+      
         vkDeviceWaitIdle(device);
     }
 }
 
 void VulkanMiragePathtracer::cleanup() {
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+    
     cleanupSwapChain();
 
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
@@ -645,6 +659,40 @@ bool VulkanMiragePathtracer::isDeviceSuitable(VkPhysicalDevice device) {
            swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
 
+void VulkanMiragePathtracer::initImgui() {
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+    
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+   // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForVulkan(window);
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = instance;
+    init_info.PhysicalDevice = physicalDevice;
+    init_info.Device = device;
+    init_info.QueueFamily = indices.graphicsFamily.value();
+    init_info.Queue = graphicsQueue;
+   // init_info.PipelineCache = piplineca;
+    init_info.DescriptorPool = descriptorPool;
+    init_info.Subpass = 0;
+    init_info.MinImageCount = 2;
+    init_info.ImageCount = 2;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    //init_info.Allocator = YOUR_ALLOCATOR;
+    init_info.RenderPass = renderPass;
+    init_info.CheckVkResultFn = check_vk_result;
+    ImGui_ImplVulkan_Init(&init_info);
+
+    
+}
+
 QueueFamilyIndices VulkanMiragePathtracer::findQueueFamilies(VkPhysicalDevice device) {
     QueueFamilyIndices indices;
     uint32_t queueFamilyCount = 0;
@@ -821,11 +869,11 @@ VkSurfaceFormatKHR VulkanMiragePathtracer::chooseSwapSurfaceFormat(
 
 VkPresentModeKHR VulkanMiragePathtracer::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR> &availablePresentModes) {
-    for (const auto &availablePresentMode: availablePresentModes) {
+    /*for (const auto &availablePresentMode: availablePresentModes) {
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
-    }
+    }*/
 
     return VK_PRESENT_MODE_FIFO_KHR;
 }
@@ -978,6 +1026,14 @@ void VulkanMiragePathtracer::createTextureImage() {
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void VulkanMiragePathtracer::check_vk_result(VkResult err) {
+    if (err == 0)
+        return;
+    fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
+    if (err < 0)
+        abort();
+}
+
 
 void VulkanMiragePathtracer::createCommandBuffers() {
     commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1044,6 +1100,12 @@ void VulkanMiragePathtracer::recordCommandBuffer(VkCommandBuffer commandBuffer, 
 
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->meshes[0].get()->indices.size()), 1, 0, 0, 0);
 
+    // Rendering
+    // (Your code clears your framebuffer, renders your other stuff etc.)
+    ImGui::Render(); //I hope it's correct
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers[currentFrame]);
+    // (Your code calls vkCmdEndRenderPass, vkQueueSubmit, vkQueuePresentKHR etc.)
+    
         vkCmdEndRenderPass(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -1069,9 +1131,13 @@ void VulkanMiragePathtracer::drawFrame() {
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
+  
+    
     vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
+    
+    
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -1139,6 +1205,7 @@ void VulkanMiragePathtracer::createSyncObjects() {
 
 void VulkanMiragePathtracer::recreateSwapChain() {
     int width = 0, height = 0;
+    
     SDL_GetWindowSize(window, &width, &height);
     while (isMinimized) {
         SDL_Event event;
@@ -1147,7 +1214,7 @@ void VulkanMiragePathtracer::recreateSwapChain() {
             isMinimized = false;
         }
     }
-
+    
     vkDeviceWaitIdle(device);
 
     cleanupSwapChain();
@@ -1156,6 +1223,12 @@ void VulkanMiragePathtracer::recreateSwapChain() {
     createImageViews();
     createDepthResources();
     createFramebuffers();
+
+    //imgui
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+    ImGui_ImplVulkan_SetMinImageCount(minImages);
+    ImGui_ImplVulkanH_CreateOrResizeWindow(instance, physicalDevice, device, &imguiWindow, indices.graphicsFamily.value(), nullptr, width, height, minImages);
+        
 }
 
 void VulkanMiragePathtracer::cleanupSwapChain() {
@@ -1368,6 +1441,93 @@ void VulkanMiragePathtracer::copyBufferToImage(VkBuffer buffer, VkImage image, u
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanMiragePathtracer::FrameRender(ImGui_ImplVulkanH_Window *wd, ImDrawData *draw_data) {
+    VkResult err;
+
+    VkSemaphore image_acquired_semaphore  = wd->FrameSemaphores[wd->SemaphoreIndex].ImageAcquiredSemaphore;
+    VkSemaphore render_complete_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
+    err = vkAcquireNextImageKHR(device, wd->Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &wd->FrameIndex);
+    if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR)
+    {
+        framebufferResized = true;
+        return;
+    }
+    check_vk_result(err);
+
+    ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
+    {
+        err = vkWaitForFences(device, 1, &fd->Fence, VK_TRUE, UINT64_MAX);    // wait indefinitely instead of periodically checking
+        check_vk_result(err);
+
+        err = vkResetFences(device, 1, &fd->Fence);
+        check_vk_result(err);
+    }
+    {
+        err = vkResetCommandPool(device, fd->CommandPool, 0);
+        check_vk_result(err);
+        VkCommandBufferBeginInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        err = vkBeginCommandBuffer(fd->CommandBuffer, &info);
+        check_vk_result(err);
+    }
+    {
+        VkRenderPassBeginInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        info.renderPass = wd->RenderPass;
+        info.framebuffer = fd->Framebuffer;
+        info.renderArea.extent.width = wd->Width;
+        info.renderArea.extent.height = wd->Height;
+        info.clearValueCount = 1;
+        info.pClearValues = &wd->ClearValue;
+        vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+    }
+
+    // Record dear imgui primitives into command buffer
+    ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+
+    // Submit command buffer
+    vkCmdEndRenderPass(fd->CommandBuffer);
+    {
+        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkSubmitInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        info.waitSemaphoreCount = 1;
+        info.pWaitSemaphores = &image_acquired_semaphore;
+        info.pWaitDstStageMask = &wait_stage;
+        info.commandBufferCount = 1;
+        info.pCommandBuffers = &fd->CommandBuffer;
+        info.signalSemaphoreCount = 1;
+        info.pSignalSemaphores = &render_complete_semaphore;
+
+        err = vkEndCommandBuffer(fd->CommandBuffer);
+        check_vk_result(err);
+        err = vkQueueSubmit(graphicsQueue, 1, &info, fd->Fence);
+        check_vk_result(err);
+    }
+}
+
+void VulkanMiragePathtracer::FramePresent(ImGui_ImplVulkanH_Window *wd) {
+    if (framebufferResized)
+        return;
+    VkSemaphore render_complete_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
+    VkPresentInfoKHR info = {};
+    info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    info.waitSemaphoreCount = 1;
+    info.pWaitSemaphores = &render_complete_semaphore;
+    info.swapchainCount = 1;
+    info.pSwapchains = &wd->Swapchain;
+    info.pImageIndices = &wd->FrameIndex;
+    VkResult err = vkQueuePresentKHR(graphicsQueue, &info);
+    if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR)
+    {
+        framebufferResized = true;
+        return;
+    }
+    check_vk_result(err);
+    wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount; // Now we can use the next set of semaphores
 }
 
 void VulkanMiragePathtracer::createIndexBuffer() {

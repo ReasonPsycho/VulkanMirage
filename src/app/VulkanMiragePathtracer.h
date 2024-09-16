@@ -8,6 +8,11 @@
 #include <array>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_vulkan.h"
+
 #include <SDL2/SDL.h>
 #include <SDL_vulkan.h>
 #include <glm/gtx/transform.hpp>
@@ -15,7 +20,6 @@
 #include <chrono>
 #include <fstream>
 #include <set>
-
 #include "model/Model.h"
 #include <iostream>
 #include <stdexcept>
@@ -89,7 +93,7 @@ private:
     void     createImageViews();
 
     bool isDeviceSuitable(VkPhysicalDevice device);
-
+    void initImgui();
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
     bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char *> &requiredExtensions);
@@ -120,6 +124,7 @@ private:
     void createFramebuffers();
     void createCommandPool();
     void createTextureImage();
+    static void check_vk_result(VkResult err);
 
     void createCommandBuffers();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -138,6 +143,10 @@ private:
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
+ void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data);
+
+    void FramePresent(ImGui_ImplVulkanH_Window* wd);
+
     void createIndexBuffer();
 void     createUniformBuffers();
 
@@ -147,6 +156,7 @@ void     createUniformBuffers();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
+    const int minImages = 2;
 
     bool framebufferResized = false;
     bool isMinimized = false;
@@ -156,10 +166,12 @@ void     createUniformBuffers();
     Model *model;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
-    
+    ImGuiIO io;
     const std::vector<const char *> validationLayers = {
         "VK_LAYER_KHRONOS_validation"
     };
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    ImGui_ImplVulkanH_Window imguiWindow ;
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
@@ -203,7 +215,6 @@ void     createUniformBuffers();
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkSurfaceKHR surface;
-
 #ifdef DEBUG_BUILD
     const bool enableValidationLayers = true;
 #else
@@ -216,13 +227,14 @@ inline void VulkanMiragePathtracer::createDescriptorPool() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2); //TODO ensure i don't wase space couse imgui XD
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // needed by imgui
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2);
 
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
