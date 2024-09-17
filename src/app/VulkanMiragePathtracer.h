@@ -215,6 +215,7 @@ void     createUniformBuffers();
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkSurfaceKHR surface;
+
 #ifdef DEBUG_BUILD
     const bool enableValidationLayers = true;
 #else
