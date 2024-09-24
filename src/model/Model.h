@@ -49,114 +49,12 @@ public:
      */
     vector<unique_ptr<Mesh> > meshes;
 
-    /**
-     
-     \class Model
-     
-     \brief Represents a 3D model.
-     
-     The Model class is responsible for loading and storing a 3D model from a given file path. It uses the ASSIMP library to read model files.
-     
-     \var vector<shared_ptr<Texture>> Model::textures_loaded
-     
-     \brief A vector of loaded textures.
-     
-     The textures_loaded vector stores shared_ptr objects that point to loaded textures. Each texture is represented by a Texture object.
-     
-     \var vector<unique_ptr<Mesh>> Model::meshes
-     
-     \brief A vector of meshes.
-     
-     The meshes vector stores unique_ptr objects that point to Mesh objects. Each Mesh object represents a mesh of the model.
-     
-     \var string Model::directory
-     
-     \brief The directory path of the model file.
-     
-     The directory variable stores the directory path of the model file. This path is used to resolve relative paths of textures used by the model.
-     
-     \param path The file path of the model.
-     \param gamma A flag indicating whether gamma correction should be applied to the loaded textures.
-     
-     \fn void Model::loadModel(string const &path)
-     
-     \brief Loads the model from the given file.
-     
-     The loadModel function reads the model file using the ASSIMP library. It checks for errors and retrieves the directory path of the file. Then, it recursively processes the root node of the model.
-     
-     \param path The file path of the model.
-     
-     \fn void Model::processNode(aiNode *node, const aiScene *scene)
-     
-     \brief Processes a node of the model.
-     
-     The processNode function recursively processes a node of the model hierarchy. It processes each mesh in the node and processes its child nodes.
-     
-     \param node The node to process.
-     \param scene The ASSIMP scene object.
-     
-     \fn unique_ptr<Mesh> Model::processMesh(aiMesh *mesh, const aiScene *scene)
-     
-     \brief Processes a mesh of the model.
-     
-     The processMesh function processes a mesh of the model. It creates a Mesh object and sets its data using the information from the mesh.
-     
-     \param mesh The mesh to process.
-     \param scene The ASSIMP scene object.
-     
-     \fn shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial *mat, aiTextureType type)
-     
-     \brief Loads a material texture.
-     
-     The loadMaterialTexture function loads a material texture from the given material and texture type. It returns a shared_ptr object that points to the loaded texture.
-     
-     \param mat The material.
-     \param type The texture type.
-     
-     \struct Texture
-     
-     \brief Holds the data for a texture.
-     
-     The Texture structure consists of a pointer to the texture data, as well as the width, height, and number of channels of the texture.
-     
-     \var void* Texture::data
-     
-     \brief A pointer to the texture data.
-     
-     The data variable stores a pointer to the texture data. It can be used to access the raw texture data.
-     
-     \var int Texture::width
-     
-     \brief The width of the texture.
-     
-     The width variable stores the width of the texture in pixels.
-     
-     \var int Texture::height
-     
-     \brief The height of the texture.
-     
-     The height variable stores the height of the texture in pixels.
-     
-     \var int Texture::channels
-     
-     \brief The number of channels of the texture.
-     
-     The channels variable stores the number of channels of the texture. For example, 3 for RGB and 4 for RGBA.
-     
-     \class Mesh
-     
-     \brief Represents a mesh.
-     
-     The Mesh class is responsible for storing mesh data, such as vertex positions, normals, texture coordinates, and indices.
-     
-     \fn Mesh::Mesh()
-     
-     \brief Constructs a Mesh object.
-     
-     The constructor initializes the mesh data with default values.
-     
-     */
+
+
     string directory;
+
+
+
     /**
      * @brief Initializes a new instance of the Model class.
      * @param path The path to the model file.
