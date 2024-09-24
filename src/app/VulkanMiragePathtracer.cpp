@@ -1568,9 +1568,9 @@ void VulkanMiragePathtracer::drawFrame2() {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    vkResetFences(device, 1, &inFlightFences2[1]);
+    vkResetFences(device, 1, &inFlightFences2[currentFrame2]);
     
-    vkResetCommandBuffer(drawCmdBuffers[1], /*VkCommandBufferResetFlagBits*/ 0);
+    vkResetCommandBuffer(drawCmdBuffers[currentFrame2], /*VkCommandBufferResetFlagBits*/ 0);
     buildCommandBuffers();
 
     VkSubmitInfo submitInfo{};
