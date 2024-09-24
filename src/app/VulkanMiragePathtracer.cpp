@@ -1568,9 +1568,9 @@ void VulkanMiragePathtracer::drawFrame2() {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    vkResetFences(device, 1, &inFlightFences2[currentFrame2]);
+    vkResetFences(device, 1, &inFlightFences2[1]);
     
-    vkResetCommandBuffer(drawCmdBuffers[currentFrame2], /*VkCommandBufferResetFlagBits*/ 0);
+    vkResetCommandBuffer(drawCmdBuffers[1], /*VkCommandBufferResetFlagBits*/ 0);
     buildCommandBuffers();
 
     VkSubmitInfo submitInfo{};
@@ -2877,8 +2877,8 @@ void VulkanMiragePathtracer::flushCommandBuffer(VkCommandBuffer commandBuffer) {
 void VulkanMiragePathtracer::updateUniformBuffers() {
     UniformBufferObject ubo2{};
     
-    uniformData.projInverse = glm::inverse(glm::perspective(glm::radians(180.0f), 800 / (float) 800, 0.1f,100.0f));
-    uniformData.viewInverse = glm::lookAt(glm::vec3(20.0f, 20.0f, 20.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    uniformData.projInverse = glm::inverse(glm::perspective(glm::radians(90.0f), 800 / (float) 800, 0.1f,100.0f));
+    uniformData.viewInverse =  glm::inverse(glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
     memcpy(ubo.mapped, &uniformData, sizeof(uniformData));
 }
 
